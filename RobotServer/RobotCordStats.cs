@@ -18,5 +18,5 @@ public struct RobotCordStats
     }
 
     public override string ToString() =>
-        $"[X : {XCord}; Y : {YCord}]";
+        $"Robot's position: ({XCord}, {YCord})";
 }

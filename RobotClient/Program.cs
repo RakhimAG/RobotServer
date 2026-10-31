@@ -33,16 +33,20 @@ while (isRunning)
     Console.WriteLine("COMMANDS : ");
     Console.WriteLine
     (
-        " LEFT : X - 1\n RIGHT : X + 1\n UP : Y + 1\n DOWN : Y - 1\n POSITION : CURRENT CORDS\n EXIT : CLOSE PROGRAM"
+        " LEFT : X - 1\n RIGHT : X + 1\n UP : Y + 1\n DOWN : Y - 1\n POSITION : CURRENT CORDS\n EXIT : TURN OFF THE ROBOT AND EXIT"
     );
 
-    var userInput = Console.ReadLine()!.ToUpper();
-    
-    if (userInput == "EXIT")
+    var userInput = Console.ReadLine()!;
+
+    if (string.IsNullOrEmpty(userInput))
     {
-        Console.WriteLine("Exiting...");
-        socket.Close();
-        return;
+        Console.ForegroundColor = ConsoleColor.Red;
+        Console.WriteLine("You can't send empty command!");
+        Console.ResetColor();
+
+        Console.WriteLine("Press any key to continue..");
+        Console.ReadKey(true);
+        continue;
     }
 
     var userInputBytes = Encoding.UTF8.GetBytes(userInput);
@@ -53,12 +57,14 @@ while (isRunning)
     }
     catch (SocketException)
     {
+        Console.ForegroundColor = ConsoleColor.Red;
         Console.WriteLine("Server closed connection");
+        Console.ResetColor();
+
         Console.WriteLine("Programm will close automaticly");
         socket.Close();
         return;
     }
-
 
     int receivedSize;
     try
@@ -76,5 +82,12 @@ while (isRunning)
     Console.WriteLine($"[SER] => {receivedMessage}");
     Console.WriteLine("Press any key to continue!");
     Console.ReadKey(true);
+
+    if (userInput == "EXIT")
+    {
+        Console.WriteLine("Exiting...");
+        isRunning = false;
+        socket.Close();
+    }
 }
 

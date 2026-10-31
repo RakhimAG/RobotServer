@@ -27,6 +27,7 @@ Log.Debug("Server's socket created successfully");
 
 IPEndPoint iPEndPoint = new(IPAddress.Any, 5000);
 socket.Bind(iPEndPoint);
+bool isRobotOnline = true;
 
 Log.Debug("Binded IpEndPoint to server's socket");
 
@@ -37,7 +38,7 @@ byte[] commandBuffer = new byte[1024];
 
 var robotStats = new RobotCordStats();
 
-async void SendMessageToClientAsync(Socket client, string message)
+async Task SendMessageToClientAsync(Socket client, string message)
 {
     var messageBytes = Encoding.UTF8.GetBytes(message);
     Log.Debug("Server is preparing to send a message..");
@@ -68,8 +69,18 @@ async Task HandleClient(Socket client)
         string command;
         try
         {
-            var receivedCommand = await client.ReceiveAsync(commandBuffer);
-            command = Encoding.UTF8.GetString(commandBuffer, 0, receivedCommand);
+            var receivedCommandLength = await client.ReceiveAsync(commandBuffer);
+            if (receivedCommandLength == 0)
+            {
+                Log.Warning("Client closed connection gracefully");
+                client.Close();
+                clientExists = false;
+                continue;
+            }
+            command = Encoding.UTF8.GetString(commandBuffer, 0, receivedCommandLength)
+                      .Trim()
+                      .ToUpper();
+
             Log.Information($"Received COMMAND => {command}");
         }
         catch (ObjectDisposedException)
@@ -82,7 +93,7 @@ async Task HandleClient(Socket client)
         {
             client.Close();
             clientExists = false;
-            Log.Error("Client's socket was closed in client side, when waited to receive a message");
+            Log.Error("Client crashed, when waited to receive a message");
             break;
         }
         
@@ -90,44 +101,52 @@ async Task HandleClient(Socket client)
         {
             case "RIGHT":
                 ++robotStats.XCord;
-                SendMessageToClientAsync(client, robotStats.ToString());
+                await SendMessageToClientAsync(client, robotStats.ToString());
                 break;
 
             case "LEFT":
                 --robotStats.XCord;
-                SendMessageToClientAsync(client, robotStats.ToString());
+                await SendMessageToClientAsync(client, robotStats.ToString());
                 break;
 
             case "UP":
                 ++robotStats.YCord;
-                SendMessageToClientAsync(client, robotStats.ToString());
+                await SendMessageToClientAsync(client, robotStats.ToString());
                 break;
 
             case "DOWN":
                 --robotStats.YCord;
-                SendMessageToClientAsync(client, robotStats.ToString());
+                await SendMessageToClientAsync(client, robotStats.ToString());
                 break;
 
             case "POSITION":
-                SendMessageToClientAsync(client, robotStats.ToString());
+                await SendMessageToClientAsync(client, robotStats.ToString());
+                break;
+
+            case "EXIT":
+                Log.Information("Client requested EXIT command, turning off the robot..");
+                await SendMessageToClientAsync(client, "Robot is going offline..");
+                isRobotOnline = false;
+                clientExists = false;
                 break;
 
             default:
-                SendMessageToClientAsync(client, "This command does not exist!");
+                await SendMessageToClientAsync(client, "This command does not exist!");
                 Log.Warning("Client sent non-existent command, sending a response-warning to client..");
                 break;
         }
     }
 }
 
-while (true)
+Log.Information("Robot is now online!");
+while (isRobotOnline)
 {
-    Log.Information("Waiting for new connection...");
+    Log.Information("Waiting for client to join...");
     var client = await socket.AcceptAsync();
     clientExists = true;
     Log.Information("New connection was received!");
 
     Log.Information("Working with the connection...");
     await HandleClient(client);
-    Log.Information("Connection was closed.");
 }
+Log.Information("Robot is now offline.");
